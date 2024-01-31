@@ -29,6 +29,7 @@ class QUIK:
         self.fp_indices = None
         self.col_perm = None
         self.inv_col_perm = None
+        self.quantizer: quant_sim.WeightQuantizer = None
         
         if fp_features > 0:    
             self.fp_indices = torch.sort(act_scales)[1][-fp_features:]
@@ -64,12 +65,15 @@ class QUIK:
                 # Then, we permute the columns so the integer part is on the left
                 self.quantizer.find_params(W[:, self.int_indices])
                 W = W[:, self.col_perm]
+                # 取 col_perm的行和列的子矩阵
                 self.H = self.H[self.col_perm, :][:, self.col_perm]
             else:
                 self.quantizer.find_params(W)
 
         H = self.H
         del self.H
+        # Wii的二阶导=0意味着什么？
+        ## 数学角度上是 在Wii处的一阶导数为常数 -> 在Wii方向上的变化是线性的或平坦的
         dead = torch.diag(H) == 0
         H[dead, dead] = 1
         W[:, dead] = 0
@@ -114,7 +118,7 @@ class QUIK:
                 Q1[:, i] = q
                 Losses1[:, i] = (w - q) ** 2 / d ** 2
 
-                err1 = (w - q) / d
+                err1: torch.Tensor = (w - q) / d
                 W1[:, i:] -= err1.unsqueeze(1).matmul(Hinv1[i, i:].unsqueeze(0))
                 Err1[:, i] = err1
 

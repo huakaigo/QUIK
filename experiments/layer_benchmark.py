@@ -6,14 +6,17 @@ import numpy as np
 
 
 fp_features_num = 256
-model_sizes = [(4096, 4096), (8192, 1024), (8192, 8192), (4096, 11088), (28672, 8192), (8192, 28672)]
+# model_sizes = [(4096, 4096*3), (4096, 11008*2), (11008*2, 4096), (11008, 4096)]#[(4096, 4096), (8192, 1024), (8192, 8192), (4096, 11008), (28672, 8192), (8192, 28672)]
+# model_sizes = [(4096, 4096*3)]
+
+model_sizes = [(4096, 4096), (4096, 4096*3), (4096, 11008), (11008, 4096), (4096, 11008*2), (11008*2, 4096), (8192, 1024), (8192, 8192), (28672, 8192), (8192, 28672)]
 
 
 def benchmark(args):
     global model_sizes
     input_size = args.input_size
     for (feature_dim_in, feature_dim_out) in model_sizes:
-        for dtype in [torch.float16, torch.bfloat16]:
+        for dtype in [torch.float16]:
             x = torch.rand((input_size, feature_dim_in)).cuda().to(dtype)
             def run_benchmark(module):
                 num_bench_steps = 100
@@ -46,7 +49,7 @@ def benchmark(args):
             # int4_optim = Linear4bit(feature_dim_in, feature_dim_out).cuda()
             # int8_optim = Linear8bit(feature_dim_in, feature_dim_out).cuda()
 
-            print(f"{dtype}. Sizes: {baseline_mod.weight.shape}")
+            print(f"{dtype}. Sizes: {list(reversed(baseline_mod.weight.shape))}")
             times = []
             for i in range(10):
                 times.append(run_benchmark(int4_mod))

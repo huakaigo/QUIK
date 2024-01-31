@@ -8,8 +8,13 @@ import quant_sim
 import qlinear
 import tqdm
 import math
+from typing import Dict
 
 from transformers.models.llama.modeling_llama import LlamaAttention
+# 配置代理，否则无法拉取huggingface datasets
+import os
+os.environ['HTTP_PROXY'] = 'http://10.4.236.41:8888'
+os.environ['HTTPS_PROXY'] = 'http://10.4.236.41:8888'
 
 DEV = torch.device('cuda:0') if torch.cuda.is_available() else torch.device('cpu')
 
@@ -19,12 +24,13 @@ def llama_parser():
     parser.add_argument(
         '--model', type=str,
         help='LLAMA-2 model to load;',
-        default='meta-llama/Llama-2-7b-hf', 
-        choices=[
-        'meta-llama/Llama-2-7b-hf',
-        'meta-llama/Llama-2-13b-hf',
-        'meta-llama/Llama-2-70b-hf'
-        ]
+        default="/data/liuhuakai/model/llama-7b/"
+        # default='meta-llama/Llama-2-7b-hf', 
+        # choices=[
+        # 'meta-llama/Llama-2-7b-hf',
+        # 'meta-llama/Llama-2-13b-hf',
+        # 'meta-llama/Llama-2-70b-hf'
+        # ]
     )
     parser.add_argument(
         '--dataset', type=str, choices=['wikitext2', 'ptb', 'c4'],
@@ -111,6 +117,8 @@ def llama_sequential(model, dataloader, act_scales, dev, save_dict, args):
             cache['attention_mask'] = kwargs['attention_mask']
             cache['position_ids'] = kwargs['position_ids']
             raise ValueError
+    # 这一步实现是为了拿到第一层的输入数据
+    ## 拿到输入数据后抛异常，跳过后续计算
     layers[0] = Catcher(layers[0])
     for batch in dataloader:
         try:
@@ -143,11 +151,11 @@ def llama_sequential(model, dataloader, act_scales, dev, save_dict, args):
             ['mlp.down_proj']
         ]
         for names in sequential:
-            subset = {n: full[n] for n in names}
+            subset: Dict[str, torch.nn.Module] = {n: full[n] for n in names}
             
             
 
-            modules_quik = {}
+            modules_quik: Dict[str, quik_utils.QUIK] = {}
             for name in subset:
 
                 if args.fp_features_num > 0 or args.fp_features_frac is not None:
@@ -459,6 +467,7 @@ if __name__ == '__main__':
         else:
             act_scales = None
     
+    # 执行量化
     if args.w_bits < 16 and not args.load_qmodel_path:
         save_dict = {}
         dataloader, testloader = datautils.get_loaders(
@@ -475,8 +484,11 @@ if __name__ == '__main__':
         save_dict = torch.load(args.load_qmodel_path)
         model.load_state_dict(save_dict["model"])
 
+    # 配置量化结果，实现推理Module
     if args.a_bits < 16:
 
+        # 替换为混合量化的linear实现
+        # 这里是伪量化，用fp16模拟int4的计算
         quant_sim.add_actquant(model)
         layers = modelutils.find_layers(model)
 

@@ -14,7 +14,7 @@ def two_compl(x: Tensor, bits: int) -> Tensor:
 
 def pack_to_i4(X: Tensor):
     X_i8 = two_compl(X.to(dtype=torch.int8), 4).to(torch.uint8)
-    X_i4 = X_i8[:, 0::2] | (X_i8[:, 1::2] << 4)
+    X_i4 = X_i8[:, 0::2] | (X_i8[:, 1::2] << 4) # 将2个int4打包成一个uint8
     return X_i4
 
 
